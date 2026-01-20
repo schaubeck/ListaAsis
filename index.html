@@ -70,9 +70,14 @@
         <!-- Action Bar -->
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-bold text-gray-800">Lista de Asistentes</h2>
-            <button onclick="downloadPDF()" id="btn-download" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition duration-200 opacity-50 cursor-not-allowed" disabled>
-                <i class="fa-solid fa-file-pdf mr-2"></i> Descargar Lista
-            </button>
+            <div class="flex gap-2">
+                <button onclick="clearAll()" id="btn-clear" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 hidden">
+                    <i class="fa-solid fa-trash-can mr-2"></i> Limpiar Todo
+                </button>
+                <button onclick="downloadPDF()" id="btn-download" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition duration-200 opacity-50 cursor-not-allowed" disabled>
+                    <i class="fa-solid fa-file-pdf mr-2"></i> Descargar Lista
+                </button>
+            </div>
         </div>
 
         <!-- Table Section -->
@@ -102,13 +107,13 @@
 
     <!-- Footer -->
     <footer class="bg-gray-800 text-gray-400 py-6 text-center text-sm">
-        <p>&copy; 2024 Sistema de Gestión de Eventos. Generado localmente.</p>
+        <p>&copy; 2024 Control de Asistencia. Los datos se guardan automáticamente en tu navegador.</p>
     </footer>
 
     <!-- Logic -->
     <script>
-        // State
-        let attendees = [];
+        // State - Load from LocalStorage on start
+        let attendees = JSON.parse(localStorage.getItem('course_attendees')) || [];
 
         // DOM Elements
         const form = document.getElementById('attendee-form');
@@ -116,6 +121,7 @@
         const emptyState = document.getElementById('empty-state');
         const countBadge = document.getElementById('count-badge');
         const btnDownload = document.getElementById('btn-download');
+        const btnClear = document.getElementById('btn-clear');
 
         // Initial Render
         renderList();
@@ -135,6 +141,7 @@
             };
 
             attendees.push(newAttendee);
+            saveData(); // Persistent save
             
             // Reset form
             nameInput.value = '';
@@ -149,8 +156,24 @@
         function deleteAttendee(id) {
             if(confirm('¿Estás seguro de eliminar a este asistente?')) {
                 attendees = attendees.filter(a => a.id !== id);
+                saveData(); // Persistent save
                 renderList();
             }
+        }
+
+        // Clear All
+        function clearAll() {
+            if(confirm('¿Estás seguro de borrar TODA la lista? Esta acción no se puede deshacer.')) {
+                attendees = [];
+                saveData();
+                renderList();
+                showToast('Lista vaciada');
+            }
+        }
+
+        // Save to LocalStorage
+        function saveData() {
+            localStorage.setItem('course_attendees', JSON.stringify(attendees));
         }
 
         // Render Logic
@@ -163,11 +186,13 @@
                 btnDownload.disabled = true;
                 btnDownload.classList.add('opacity-50', 'cursor-not-allowed');
                 btnDownload.classList.remove('hover:bg-red-600');
+                btnClear.classList.add('hidden');
             } else {
                 emptyState.style.display = 'none';
                 btnDownload.disabled = false;
                 btnDownload.classList.remove('opacity-50', 'cursor-not-allowed');
                 btnDownload.classList.add('hover:bg-red-600');
+                btnClear.classList.remove('hidden');
 
                 attendees.forEach((person, index) => {
                     const row = document.createElement('tr');
@@ -239,7 +264,7 @@
 
             // Save
             doc.save(`lista_asistencia_${new Date().toISOString().slice(0,10)}.pdf`);
-            showToast('PDF descargado exitosamente');
+            showToast('PDF generado correctamente');
         }
 
         // Simple Toast Notification
