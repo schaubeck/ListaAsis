@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor de Asistentes</title>
+    <title>Gestor de Asistentes Cloud</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,109 +11,26 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- jsPDF & AutoTable Libraries for PDF generation -->
+    <!-- jsPDF & AutoTable Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 
-    <style>
-        body {
-            background-color: #f3f4f6;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .animate-fade-in {
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
-</head>
-<body class="text-gray-800 h-screen flex flex-col">
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    <!-- Navbar -->
-    <nav class="bg-indigo-600 text-white shadow-lg">
-        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
-            <div class="flex items-center space-x-2">
-                <i class="fa-solid fa-clipboard-user text-2xl"></i>
-                <h1 class="text-xl font-bold">Control de Asistencia</h1>
-            </div>
-            <div class="text-sm bg-indigo-700 px-3 py-1 rounded-full">
-                <span id="count-badge">0</span> Asistentes
-            </div>
-        </div>
-    </nav>
+        // Firebase Configuration (Provided by environment)
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-    <!-- Main Content -->
-    <main class="flex-grow max-w-5xl mx-auto px-4 py-8 w-full">
-        
-        <!-- Input Section -->
-        <div class="bg-white rounded-xl shadow-md p-6 mb-8 border-l-4 border-indigo-500">
-            <h2 class="text-lg font-semibold mb-4 text-gray-700">Registrar Nuevo Asistente</h2>
-            <form id="attendee-form" class="flex flex-col md:flex-row gap-4">
-                <div class="flex-grow">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre Completo</label>
-                    <input type="text" id="name" placeholder="Ej. Juan Pérez" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
-                </div>
-                <div class="flex-grow">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Correo Electrónico / Rol</label>
-                    <input type="text" id="email" placeholder="Ej. juan@empresa.com" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div class="flex items-end">
-                    <button type="submit" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2 shadow-md">
-                        <i class="fa-solid fa-plus"></i> Agregar
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Action Bar -->
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold text-gray-800">Lista de Asistentes</h2>
-            <div class="flex gap-2">
-                <button onclick="clearAll()" id="btn-clear" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 hidden">
-                    <i class="fa-solid fa-trash-can mr-2"></i> Limpiar Todo
-                </button>
-                <button onclick="downloadPDF()" id="btn-download" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition duration-200 opacity-50 cursor-not-allowed" disabled>
-                    <i class="fa-solid fa-file-pdf mr-2"></i> Descargar Lista
-                </button>
-            </div>
-        </div>
-
-        <!-- Table Section -->
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden min-h-[300px] relative">
-            <table class="w-full text-left border-collapse">
-                <thead class="bg-gray-100 text-gray-600 uppercase text-xs font-bold">
-                    <tr>
-                        <th class="p-4 border-b">#</th>
-                        <th class="p-4 border-b">Nombre</th>
-                        <th class="p-4 border-b">Correo / Detalle</th>
-                        <th class="p-4 border-b text-center">Hora Registro</th>
-                        <th class="p-4 border-b text-center">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="attendee-list" class="divide-y divide-gray-100">
-                    <!-- Rows will be injected here JS -->
-                </tbody>
-            </table>
-
-            <!-- Empty State -->
-            <div id="empty-state" class="flex flex-col items-center justify-center h-64 text-gray-400">
-                <i class="fa-regular fa-folder-open text-5xl mb-3"></i>
-                <p class="text-lg">No hay asistentes registrados aún.</p>
-            </div>
-        </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-gray-800 text-gray-400 py-6 text-center text-sm">
-        <p>&copy; 2024 Control de Asistencia. Los datos se guardan automáticamente en tu navegador.</p>
-    </footer>
-
-    <!-- Logic -->
-    <script>
-        // State - Load from LocalStorage on start
-        let attendees = JSON.parse(localStorage.getItem('course_attendees')) || [];
+        // State
+        let user = null;
+        let attendees = [];
 
         // DOM Elements
         const form = document.getElementById('attendee-form');
@@ -122,61 +39,113 @@
         const countBadge = document.getElementById('count-badge');
         const btnDownload = document.getElementById('btn-download');
         const btnClear = document.getElementById('btn-clear');
+        const loadingOverlay = document.getElementById('loading-overlay');
 
-        // Initial Render
-        renderList();
+        // 1. Authentication Strategy
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+                showToast("Error de conexión");
+            }
+        };
 
-        // Add Attendee Event
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
+        onAuthStateChanged(auth, (u) => {
+            user = u;
+            if (user) {
+                setupRealtimeListener();
+            }
+        });
+
+        initAuth();
+
+        // 2. Real-time Firestore Listener (Public Collection for sharing)
+        const setupRealtimeListener = () => {
+            const publicDataRef = collection(db, 'artifacts', appId, 'public', 'data', 'attendees');
             
+            onSnapshot(publicDataRef, (snapshot) => {
+                attendees = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                // Ordenar por tiempo (Firestore no garantiza orden sin orderBy, pero evitamos orderBy por reglas)
+                attendees.sort((a, b) => a.timestamp - b.timestamp);
+                
+                renderList();
+                loadingOverlay.classList.add('hidden');
+            }, (error) => {
+                console.error("Firestore error:", error);
+                showToast("Error al cargar datos");
+            });
+        };
+
+        // 3. Add Attendee to Cloud
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!user) return;
+
             const nameInput = document.getElementById('name');
             const emailInput = document.getElementById('email');
 
-            const newAttendee = {
-                id: Date.now(),
+            const newEntry = {
                 name: nameInput.value.trim(),
                 email: emailInput.value.trim() || 'No especificado',
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now()
             };
 
-            attendees.push(newAttendee);
-            saveData(); // Persistent save
-            
-            // Reset form
-            nameInput.value = '';
-            emailInput.value = '';
-            nameInput.focus();
-
-            renderList();
-            showToast('Asistente agregado correctamente');
+            try {
+                const publicDataRef = collection(db, 'artifacts', appId, 'public', 'data', 'attendees');
+                await addDoc(publicDataRef, newEntry);
+                
+                nameInput.value = '';
+                emailInput.value = '';
+                nameInput.focus();
+                showToast('Asistente guardado en la nube');
+            } catch (error) {
+                showToast('Error al guardar');
+            }
         });
 
-        // Delete Attendee
-        function deleteAttendee(id) {
-            if(confirm('¿Estás seguro de eliminar a este asistente?')) {
-                attendees = attendees.filter(a => a.id !== id);
-                saveData(); // Persistent save
-                renderList();
+        // 4. Delete from Cloud
+        window.deleteAttendee = async (id) => {
+            if (!user) return;
+            if (confirm('¿Eliminar este registro de la base de datos?')) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'attendees', id);
+                    await deleteDoc(docRef);
+                    showToast('Registro eliminado');
+                } catch (error) {
+                    showToast('Error al eliminar');
+                }
             }
-        }
+        };
 
-        // Clear All
-        function clearAll() {
-            if(confirm('¿Estás seguro de borrar TODA la lista? Esta acción no se puede deshacer.')) {
-                attendees = [];
-                saveData();
-                renderList();
-                showToast('Lista vaciada');
+        // 5. Clear All
+        window.clearAll = async () => {
+            if (!user) return;
+            if (confirm('¿Borrar TODA la lista de la base de datos?')) {
+                loadingOverlay.classList.remove('hidden');
+                try {
+                    const publicDataRef = collection(db, 'artifacts', appId, 'public', 'data', 'attendees');
+                    const snapshot = await getDocs(publicDataRef);
+                    const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+                    await Promise.all(deletePromises);
+                    showToast('Base de datos vaciada');
+                } catch (error) {
+                    showToast('Error al limpiar');
+                }
+                loadingOverlay.classList.add('hidden');
             }
-        }
+        };
 
-        // Save to LocalStorage
-        function saveData() {
-            localStorage.setItem('course_attendees', JSON.stringify(attendees));
-        }
-
-        // Render Logic
+        // 6. UI Logic
         function renderList() {
             listContainer.innerHTML = '';
             countBadge.innerText = attendees.length;
@@ -185,13 +154,11 @@
                 emptyState.style.display = 'flex';
                 btnDownload.disabled = true;
                 btnDownload.classList.add('opacity-50', 'cursor-not-allowed');
-                btnDownload.classList.remove('hover:bg-red-600');
                 btnClear.classList.add('hidden');
             } else {
                 emptyState.style.display = 'none';
                 btnDownload.disabled = false;
                 btnDownload.classList.remove('opacity-50', 'cursor-not-allowed');
-                btnDownload.classList.add('hover:bg-red-600');
                 btnClear.classList.remove('hidden');
 
                 attendees.forEach((person, index) => {
@@ -203,7 +170,7 @@
                         <td class="p-4 text-gray-600">${person.email}</td>
                         <td class="p-4 text-center text-gray-500 text-sm font-mono">${person.time}</td>
                         <td class="p-4 text-center">
-                            <button onclick="deleteAttendee(${person.id})" class="text-red-400 hover:text-red-600 transition p-2 rounded-full hover:bg-red-50" title="Eliminar">
+                            <button onclick="deleteAttendee('${person.id}')" class="text-red-400 hover:text-red-600 transition p-2 rounded-full hover:bg-red-50">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
                         </td>
@@ -213,71 +180,117 @@
             }
         }
 
-        // PDF Generation Logic
-        function downloadPDF() {
-            if (attendees.length === 0) return;
-
+        // 7. PDF Logic
+        window.downloadPDF = () => {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-
-            // Header - Brand colors
-            doc.setFillColor(79, 70, 229); // Indigo 600
+            doc.setFillColor(79, 70, 229);
             doc.rect(0, 0, 210, 25, 'F');
-            
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(18);
-            doc.text("Lista de Asistencia", 14, 16);
+            doc.text("Reporte de Asistencia Cloud", 14, 16);
             
-            doc.setFontSize(10);
-            doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 160, 16);
-
-            // Table Data Preparation
-            const tableColumn = ["#", "Nombre del Asistente", "Correo / Detalle", "Hora Registro"];
-            const tableRows = [];
-
-            attendees.forEach((person, index) => {
-                const attendeeData = [
-                    index + 1,
-                    person.name,
-                    person.email,
-                    person.time
-                ];
-                tableRows.push(attendeeData);
-            });
-
-            // Generate Table
+            const rows = attendees.map((p, i) => [i + 1, p.name, p.email, p.time]);
             doc.autoTable({
-                head: [tableColumn],
-                body: tableRows,
+                head: [["#", "Nombre", "Correo", "Hora"]],
+                body: rows,
                 startY: 30,
                 theme: 'striped',
-                headStyles: { fillColor: [79, 70, 229] }, // Match brand
-                styles: { fontSize: 10, cellPadding: 3 },
-                alternateRowStyles: { fillColor: [243, 244, 246] }
+                headStyles: { fillColor: [79, 70, 229] }
             });
+            doc.save(`asistencia_nube_${new Date().toISOString().slice(0,10)}.pdf`);
+        };
 
-            // Footer info
-            const finalY = doc.lastAutoTable.finalY || 30;
-            doc.setTextColor(150);
-            doc.setFontSize(8);
-            doc.text(`Total de asistentes: ${attendees.length}`, 14, finalY + 10);
-
-            // Save
-            doc.save(`lista_asistencia_${new Date().toISOString().slice(0,10)}.pdf`);
-            showToast('PDF generado correctamente');
-        }
-
-        // Simple Toast Notification
         function showToast(message) {
             const toast = document.createElement('div');
             toast.className = 'fixed bottom-5 right-5 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl animate-fade-in z-50 flex items-center gap-2';
-            toast.innerHTML = `<i class="fa-solid fa-check-circle text-green-400"></i> ${message}`;
+            toast.innerHTML = `<i class="fa-solid fa-info-circle text-indigo-400"></i> ${message}`;
             document.body.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
         }
     </script>
+
+    <style>
+        body { background-color: #f3f4f6; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col">
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-80 z-50 flex items-center justify-center">
+        <div class="flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+            <p class="text-indigo-600 font-medium">Conectando con la base de datos...</p>
+        </div>
+    </div>
+
+    <nav class="bg-indigo-600 text-white shadow-lg">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-cloud text-2xl"></i>
+                <h1 class="text-xl font-bold">Asistencia Cloud</h1>
+            </div>
+            <div class="text-sm bg-indigo-700 px-3 py-1 rounded-full">
+                <span id="count-badge">0</span> Registrados
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-5xl mx-auto px-4 py-8 w-full">
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8 border-l-4 border-indigo-500">
+            <h2 class="text-lg font-semibold mb-4 text-gray-700">Registrar en la Nube</h2>
+            <form id="attendee-form" class="flex flex-col md:flex-row gap-4">
+                <div class="flex-grow">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre Completo</label>
+                    <input type="text" id="name" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                <div class="flex-grow">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Correo / Detalle</label>
+                    <input type="text" id="email" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="w-full md:w-auto bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 transition shadow-md">
+                        <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-800">Lista Compartida</h2>
+            <div class="flex gap-2">
+                <button id="btn-clear" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hidden">Limpiar Todo</button>
+                <button id="btn-download" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md opacity-50" disabled>
+                    <i class="fa-solid fa-file-pdf mr-2"></i> PDF
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden min-h-[300px]">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+                    <tr>
+                        <th class="p-4">#</th>
+                        <th class="p-4">Nombre</th>
+                        <th class="p-4">Detalle</th>
+                        <th class="p-4 text-center">Hora</th>
+                        <th class="p-4 text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="attendee-list" class="divide-y divide-gray-100"></tbody>
+            </table>
+            <div id="empty-state" class="flex flex-col items-center justify-center h-64 text-gray-400">
+                <i class="fa-solid fa-database text-5xl mb-3"></i>
+                <p>La base de datos está vacía.</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-800 text-gray-400 py-6 text-center text-sm">
+        <p>Sincronización en tiempo real activa. Los cambios se reflejan en todos los usuarios.</p>
+    </footer>
+
 </body>
 </html>
